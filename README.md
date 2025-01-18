@@ -6,11 +6,19 @@
 </div>
 
 ---
-### 偏移量 `4uzjr7mbsibcaldp`
-### 密钥 `[929260340, 1633971297, 895580464, 925905270]`
-### 小红书采用aes加密 具体写法可以参考 [xs_encrypt.py](https://github.com/Cloxl/xhshow/blob/master/encrypt/xs_encrypt.py)
-### 与app端 创作中心xs不通用 上述值更适合大规模采集使用
+# 小红书加密参数说明
 
+## 加密方式
+- 采用 AES 加密
+- 注意:与 APP 端创作中心的 xs 不通用
+- 以下参数更适合大规模数据采集使用
+
+## 关键参数
+- 偏移量(IV): `4uzjr7mbsibcaldp`
+- 密钥(Key): `[929260340, 1633971297, 895580464, 925905270]`
+
+## 参考资料
+参考: [xs_encrypt.py](https://github.com/Cloxl/xhshow/blob/master/encrypt/xs_encrypt.py)
 ---
 
 ## 功能支持 ✨
