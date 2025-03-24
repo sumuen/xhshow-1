@@ -8,7 +8,7 @@ from numbers import Integral
 
 from typeguard import typechecked
 
-from config import lookup
+from ..config import lookup
 
 
 class CustomFieldDecrypt:

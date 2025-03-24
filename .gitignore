@@ -6,3 +6,5 @@
 .tmp.json
 .package.json
 .package-lock.json
+logs
+__pycache__

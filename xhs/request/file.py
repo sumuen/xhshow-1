@@ -121,4 +121,5 @@ class Uploader:
 
         return {
             "PartNumber": chunk_number,
-            "E
+            "ETag": res.headers.get("ETag", "")
+        }

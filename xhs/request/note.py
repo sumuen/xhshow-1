@@ -4,9 +4,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from config import replacements
-from extractor import extract_initial_state
-from xhs.request.AsyncRequestFramework import AsyncRequestFramework
+from ..config import replacements
+from ..extractor import extract_initial_state
+from .AsyncRequestFramework import AsyncRequestFramework
 
 
 class NoteType(Enum):
@@ -178,8 +178,9 @@ class Notes:
                            search_id: str,
                            page: int = 1,
                            page_size: int = 20,
-                           sort: str = "general",
-                           note_type: int = 0) -> Dict:
+                           sort: str = "time_descending",
+                           note_type: int = 0,
+                           cookie: str = "") -> Dict:
         """搜索笔记
 
         Args:
@@ -208,10 +209,11 @@ class Notes:
             url=f"{self._host}{uri}",
             method="POST",
             json=data,
+            cookie=cookie
         )
 
     async def get_note_statistics(self,
-                                  page: int = 1,
+                                  page: int = 2,
                                   page_size: int = 48,
                                   sort_by: str = "time",
                                   note_type: int = 0,

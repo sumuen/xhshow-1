@@ -2,7 +2,7 @@ import json
 import random
 import urllib.parse
 
-from config import ie, lookup
+from ..config import ie, lookup
 
 
 class XscEncrypt:

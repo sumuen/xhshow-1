@@ -8,7 +8,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from typeguard import typechecked
 
-from config import xn, xn64
+from ..config import xn, xn64
 
 
 class XsEncrypt:
@@ -93,7 +93,7 @@ class XsEncrypt:
             ts: 时间戳
             platform: 登录平台 默认为xhs-pc-web
         Returns:
-            最终的加密签名字符串，前缀为“XYW_”
+            最终的加密签名字符串，前缀为"XYW_"
         """
         text = (f'x1={await XsEncrypt.encrypt_md5(url="url="+url)};'
                 f'x2=0|0|0|1|0|0|1|0|0|0|1|0|0|0|0|1|0|0|0;'

@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from curl_cffi.requests import AsyncSession, Response
 from loguru import logger
 
-from encrypt import MiscEncrypt, XscEncrypt, XsEncrypt
+from ..encrypt import MiscEncrypt, XscEncrypt, XsEncrypt
 
 
 class AsyncRequestFramework:
