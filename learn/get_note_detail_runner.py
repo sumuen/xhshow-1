@@ -11,6 +11,7 @@ import sys
 from typing import Set, Dict, Any
 from loguru import logger
 import json
+import argparse
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -24,12 +25,13 @@ class NoteDetailRunner:
         self.processed_notes: Set[str] = set()  # 用于存储已处理的笔记ID
         self.note_details_cache: Dict[str, dict] = {}  # 用于缓存已获取的笔记详情
         
-    async def get_note_detail(self, note_id: str, xsec_token: str):
+    async def get_note_detail(self, note_id: str, xsec_token: str, proxy=None):
         """获取单个笔记的详细信息
         
         Args:
             note_id: 笔记ID
             xsec_token: xsec_token
+            proxy: 代理设置，例如 {"http": "http://127.0.0.1:30002"}
         """
         # 如果笔记已经处理过，直接返回缓存的结果
         if note_id in self.note_details_cache:
@@ -38,11 +40,17 @@ class NoteDetailRunner:
             
         try:
             arf = AsyncRequestFramework()
+            # 初始化Notes请求对象
             note_request = Notes(arf)
             
+            # 直接传递代理参数，不修改AsyncRequestFramework对象
+            logger.debug(f"使用代理: {proxy}" if proxy else "不使用代理")
+            
+            # 显式传递xsec_token和proxy参数
             result = await note_request.get_note_detail(
                 note_id=note_id,
-                xsec_token=xsec_token
+                xsec_token=xsec_token,
+                proxy=proxy or {}
             )
             
             # 验证返回的数据结构
@@ -157,12 +165,13 @@ class NoteDetailRunner:
         except Exception as e:
             logger.error(f"保存Excel文件失败: {str(e)}")
 
-    async def process_notes(self, input_file: str, is_test: bool = False):
+    async def process_notes(self, input_file: str, is_test: bool = False, proxy=None):
         """处理笔记列表获取详细信息
         
         Args:
             input_file: 输入的Excel文件路径
             is_test: 是否为测试模式（只处理前3条）
+            proxy: 代理设置，例如 {"http": "http://127.0.0.1:30002"}
         """
         try:
             # 加载已存在的笔记详情
@@ -202,7 +211,8 @@ class NoteDetailRunner:
                 xsec_token = row['xsec_token']
                 logger.info(f"正在处理第 {index + 1} 条笔记，ID: {note_id}")
                 
-                detail = await self.get_note_detail(note_id, xsec_token)
+                # 传递proxy参数
+                detail = await self.get_note_detail(note_id, xsec_token, proxy=proxy)
                 if detail:
                     try:
                         note_info = self.format_note_detail(detail)
@@ -265,44 +275,48 @@ class NoteDetailRunner:
         return os.path.join(processed_dir, latest_file)
 
     def run_interactive(self):
-        """交互式运行"""
-        print("小红书笔记详情获取工具")
-        print("1. 运行测试模式（处理3条记录）")
-        print("2. 运行完整模式")
-        print("3. 退出")
+        """交互式运行获取笔记详情"""
+        parser = argparse.ArgumentParser(description='获取小红书笔记详情')
+        parser.add_argument('--input', '-i', help='输入文件路径')
+        parser.add_argument('--test', '-t', action='store_true', help='测试模式（只处理前3条记录）')
+        parser.add_argument('--proxy', '-p', help='代理设置（例如：http://127.0.0.1:30002）')
+        args = parser.parse_args()
         
-        while True:
-            choice = input("\n请选择操作 (1-3): ").strip()
-            
-            if choice == "1":
-                self.setup_logger(is_test=True)
-                try:
-                    input_file = self.get_latest_search_file()
-                    asyncio.run(self.process_notes(input_file, is_test=True))
-                except Exception as e:
-                    logger.error(f"运行测试模式失败: {str(e)}")
-                break
+        # 设置日志
+        self.setup_logger(args.test)
+        
+        # 处理输入文件参数
+        input_file = args.input
+        if not input_file:
+            input_file = self.get_latest_search_file()
+            if not input_file:
+                logger.error("未找到输入文件，请指定--input参数")
+                return
                 
-            elif choice == "2":
-                self.setup_logger(is_test=False)
-                try:
-                    input_file = self.get_latest_search_file()
-                    asyncio.run(self.process_notes(input_file, is_test=False))
-                except Exception as e:
-                    logger.error(f"运行完整模式失败: {str(e)}")
-                break
-                
-            elif choice == "3":
-                print("退出程序")
-                break
-                
+        logger.info(f"使用输入文件: {input_file}")
+        
+        # 处理代理参数
+        proxy = None
+        if args.proxy:
+            if args.proxy.startswith('http'):
+                proxy = {"http": args.proxy}
+                logger.info(f"使用代理: {args.proxy}")
             else:
-                print("无效的选择，请重新输入")
+                logger.warning(f"无效的代理格式: {args.proxy}，应为http(s)://地址:端口")
+        
+        # 创建事件循环运行异步函数
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.process_notes(input_file, args.test, proxy=proxy))
 
 def main():
-    """命令行入口函数"""
-    runner = NoteDetailRunner()
-    runner.run_interactive()
+    """主函数"""
+    try:
+        runner = NoteDetailRunner()
+        runner.run_interactive()
+    except KeyboardInterrupt:
+        logger.warning("程序被用户中断")
+    except Exception as e:
+        logger.error(f"程序运行出错: {str(e)}")
 
 if __name__ == "__main__":
     main() 

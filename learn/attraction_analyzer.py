@@ -252,6 +252,20 @@ class AttractionAnalyzer:
             # 生成详情文件名
             detail_file = file_path.replace('_analyzed.xlsx', '_details.xlsx')
             
+            # 检查是否已存在详情文件，如果存在则加载已有数据
+            existing_details = {}
+            if os.path.exists(detail_file):
+                try:
+                    existing_df = pd.read_excel(detail_file)
+                    logger.info(f"找到已存在的详情文件 {detail_file}，包含 {len(existing_df)} 条笔记详情")
+                    
+                    # 如果存在UID列，将已有数据转换为字典，以UID为键
+                    if 'UID' in existing_df.columns:
+                        existing_details = {row['UID']: row.to_dict() for _, row in existing_df.iterrows()}
+                        logger.info(f"已加载 {len(existing_details)} 条已存在的笔记详情数据")
+                except Exception as e:
+                    logger.warning(f"读取已存在的详情文件出错: {str(e)}，将重新创建")
+            
             # 批量处理
             batch = []
             batch_size = 5
@@ -273,6 +287,60 @@ class AttractionAnalyzer:
                     xsec_token = row['xsec_token']
                     
                     logger.info(f"正在处理第 {index} 行，笔记ID: {note_id}")
+                    
+                    # 检查是否已经获取过该笔记的详情
+                    if note_id in existing_details:
+                        logger.info(f"笔记 {note_id} 已存在于详情文件中，跳过请求")
+                        note_info = existing_details[note_id]
+                        
+                        # 保留原始相关性分析的信息
+                        for col in df_relevant.columns:
+                            if col not in note_info and col in row:
+                                note_info[col] = row[col]
+                        
+                        # 设置爬取状态为缓存
+                        note_info['爬取状态'] = 'cached'
+                        
+                        batch.append(note_info)
+                        all_processed.append(note_info)
+                        
+                        # 检查已缓存数据中的发布时间
+                        if '发布时间' in note_info and pd.notna(note_info['发布时间']):
+                            try:
+                                publish_time = int(note_info['发布时间'])
+                                
+                                # 检查是否是2024年之前的帖子
+                                if publish_time < cutoff_timestamp:
+                                    consecutive_old_posts += 1
+                                    logger.info(f"缓存中笔记 {note_id} 发布于2024年前 ({publish_time}), 连续旧帖计数: {consecutive_old_posts}")
+                                    
+                                    # 如果连续两个帖子都是2024年前的，标记剩余帖子为unnecessary并停止抓取
+                                    if consecutive_old_posts >= 2:
+                                        logger.warning("检测到连续2个2024年前的帖子，将停止继续抓取")
+                                        
+                                        # 将剩余的帖子标记为unnecessary
+                                        remaining_indices = df_relevant.index[df_relevant.index > index]
+                                        if len(remaining_indices) > 0:
+                                            df_relevant.loc[remaining_indices, '爬取状态'] = 'unnecessary'
+                                            df_relevant.to_excel(relevant_file, index=False)
+                                            logger.info(f"已将剩余 {len(remaining_indices)} 条帖子标记为unnecessary")
+                                        
+                                        break
+                                else:
+                                    consecutive_old_posts = 0  # 重置计数器
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"无法解析缓存中的发布时间: {note_info['发布时间']}, 错误: {str(e)}")
+                        
+                        # 每处理batch_size条记录保存一次
+                        if len(batch) >= batch_size:
+                            try:
+                                self.note_detail_runner.save_to_excel(batch, detail_file)
+                                logger.info(f"已保存一批 {len(batch)} 条笔记详情")
+                                batch = []  # 清空批次
+                            except Exception as save_e:
+                                logger.error(f"保存批次数据时出错: {str(save_e)}")
+                                
+                        continue  # 已处理缓存数据，继续下一条
                     
                     # 检查是否有发布时间字段
                     if '发布时间' in row and pd.notna(row['发布时间']):
@@ -302,7 +370,12 @@ class AttractionAnalyzer:
                             logger.warning(f"无法解析发布时间: {row['发布时间']}, 错误: {str(e)}")
                     
                     logger.info(f"正在获取笔记 {note_id} 的详情")
-                    detail = await self.note_detail_runner.get_note_detail(note_id, xsec_token, proxy={"http": "http://127.0.0.1:30002"})
+                    
+                    # 使用可配置的方式决定是否使用代理
+                    use_proxy = os.environ.get("USE_PROXY", "0") == "1"
+                    proxy_config = {"http": "http://127.0.0.1:30002"} if use_proxy else None
+                    
+                    detail = await self.note_detail_runner.get_note_detail(note_id, xsec_token, proxy=proxy_config)
                     
                     if detail:
                         try:
@@ -472,11 +545,19 @@ def parse_args():
     parser.add_argument('--spot_id', required=True, help='景点ID')
     parser.add_argument('--cookie', default="", help='小红书cookie')
     parser.add_argument('--log_level', default='INFO', help='日志级别')
+    parser.add_argument('--use_proxy', action='store_true', help='是否使用代理')
     return parser.parse_args()
 
 async def main():
     """主函数"""
     args = parse_args()
+    
+    # 设置代理环境变量
+    if args.use_proxy:
+        os.environ["USE_PROXY"] = "1"
+        logger.info("已启用代理")
+    else:
+        os.environ["USE_PROXY"] = "0"
     
     # 初始化景点分析器
     analyzer = AttractionAnalyzer(log_level=args.log_level)
