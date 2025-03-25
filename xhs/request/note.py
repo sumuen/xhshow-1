@@ -3,11 +3,13 @@ import os
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
+import asyncio
+import random
 
 from ..config import replacements
 from ..extractor import extract_initial_state
 from .AsyncRequestFramework import AsyncRequestFramework
-
+from loguru import logger
 
 class NoteType(Enum):
     NORMAL = "normal"
@@ -18,6 +20,8 @@ class Notes:
     def __init__(self, arf: AsyncRequestFramework):
         self.arf = arf
         self._host = "https://edith.xiaohongshu.com"
+        self.max_retries = 2  # 最大重试次数
+        self.retry_delay = 1  # 基础重试延迟（秒）
 
     async def get_note_detail(self, note_id: str, xsec_token: str = "") -> Dict:
         """获取笔记详情
@@ -28,24 +32,75 @@ class Notes:
 
         Returns:
             笔记详情信息
+
+        Raises:
+            Exception: 当请求失败或解析数据出错时抛出异常
         """
-        params = {
-            "xsec_source": "pc_feed",
-            "xsec_token": xsec_token
-        }
-        url = f"https://www.xiaohongshu.com/explore/{note_id}"
-        res = await self.arf.send_http_request(
-            url=url,
-            method="GET",
-            params=params,
-            html_mode=True,
-            back_fun=True
-        )
+        retry_count = 0
+        last_error = None
 
-        content = (await extract_initial_state(await res.acontent(), replacements)
-                   )["note"]["noteDetailMap"][f"{note_id}"]
+        while retry_count < self.max_retries:
+            try:
+                params = {
+                    "xsec_source": "pc_feed",
+                    "xsec_token": xsec_token
+                }
+                url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                
+                try:
+                    res = await self.arf.send_http_request(
+                        url=url,
+                        method="GET",
+                        params=params,
+                        back_fun=True
+                    )
+                except Exception as e:
+                    logger.error(f"请求笔记详情失败: note_id={note_id}, error={str(e)}")
+                    raise Exception(f"获取笔记详情请求失败: {str(e)}")
 
-        return content
+                try:
+                    content = await res.acontent()
+                    initial_state = await extract_initial_state(content, replacements)
+                    if not initial_state or "note" not in initial_state:
+                        raise Exception("解析笔记数据失败: 无法获取笔记信息")
+                    
+                    note_detail = initial_state["note"]["noteDetailMap"].get(f"{note_id}")
+                    if not note_detail:
+                        retry_count += 1
+                        if retry_count >= self.max_retries:
+                            raise Exception(f"未找到笔记详情，已重试{retry_count}次: note_id={note_id}")
+                        
+                        # 计算延迟时间，使用指数退避策略
+                        delay = self.retry_delay * (1 + random.random()) * (2 ** (retry_count - 1))
+                        logger.warning(f"未找到笔记详情，将在{delay:.2f}秒后进行第{retry_count + 1}次重试: note_id={note_id}")
+                        await asyncio.sleep(delay)
+                        continue
+                    
+                    return note_detail
+                except Exception as e:
+                    last_error = e
+                    logger.error(f"解析笔记详情失败: note_id={note_id}, error={str(e)}")
+                    if retry_count >= self.max_retries - 1:
+                        raise Exception(f"解析笔记详情数据失败: {str(e)}")
+                    
+                    retry_count += 1
+                    delay = self.retry_delay * (1 + random.random()) * (2 ** (retry_count - 1))
+                    logger.warning(f"解析失败，将在{delay:.2f}秒后进行第{retry_count + 1}次重试: note_id={note_id}")
+                    await asyncio.sleep(delay)
+                    
+            except Exception as e:
+                last_error = e
+                if retry_count >= self.max_retries - 1:
+                    logger.error(f"获取笔记详情失败，已达到最大重试次数: note_id={note_id}, error={str(e)}")
+                    raise
+                
+                retry_count += 1
+                delay = self.retry_delay * (1 + random.random()) * (2 ** (retry_count - 1))
+                logger.warning(f"请求失败，将在{delay:.2f}秒后进行第{retry_count + 1}次重试: note_id={note_id}")
+                await asyncio.sleep(delay)
+
+        if last_error:
+            raise last_error
 
     async def create_note(self,
                           title: str,

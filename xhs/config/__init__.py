@@ -38,7 +38,7 @@ xn64 = xn[64]
 
 replacements = {
     'undefined': 'null',
-    "'": '"',
+    # "'": '"',
     'True': 'true',
     'False': 'false',
     'None': 'null'
