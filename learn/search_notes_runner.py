@@ -64,12 +64,12 @@ def format_note_info(note):
     user = note_card.get('user', {})
     
     return {
-        'title': note_card.get('display_title', ''),
-        'type': note_card.get('type', 'normal'),
-        'author': user.get('nickname', ''),
-        'user_id': user.get('user_id', ''),
-        'id': note.get('id', ''),
-        'like_count': note_card.get('interact_info', {}).get('liked_count', ''),
+        '标题': note_card.get('display_title', ''),
+        '类型': note_card.get('type', 'normal'),
+        '作者': user.get('nickname', ''),
+        '用户ID': user.get('user_id', ''),
+        'UID': note.get('id', ''),
+        '点赞数': note_card.get('interact_info', {}).get('liked_count', ''),
         'xsec_token': note.get('xsec_token', '')
     }
 
@@ -92,9 +92,10 @@ async def process_keyword(keyword: str, attraction_id: str, cookie: str):
             for item in items:
                 if item.get('model_type') == 'note':
                     note_info = format_note_info(item)
-                    note_info['attraction_id'] = attraction_id
-                    note_info['keyword'] = keyword
-                    note_info['url'] = f"https://www.xiaohongshu.com/explore/{note_info['id']}?xsec_token={note_info['xsec_token']}"
+                    note_info['景区ID'] = attraction_id
+                    note_info['景区关键词'] = keyword
+                    note_info['数据来源'] = '小红书'
+                    note_info['链接'] = f"https://www.xiaohongshu.com/explore/{note_info['UID']}?xsec_token={note_info['xsec_token']}"
                     all_notes.append(note_info)
             
             logger.info(f"关键词 '{keyword}' 第 {page} 页找到 {len(items)} 条笔记")
@@ -144,7 +145,8 @@ async def main():
     # 保存结果
     if all_results:
         result_df = pd.DataFrame(all_results)
-        output_file = f"search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        # 保存到processed目录
+        output_file = f"processed/search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         result_df.to_excel(output_file, index=False)
         logger.info(f"结果已保存到: {output_file}")
         logger.info(f"总共找到 {len(all_results)} 条笔记")
