@@ -128,7 +128,7 @@ async def main():
         logger.error(f"读取关键词文件失败: {str(e)}")
         return
     
-    cookie = "abRequestId=87bd2bac-2376-5b13-b127-2ae18c57efdd; webBuild=4.60.1; xsecappid=xhs-pc-web; loadts=1742796036821; a1=195c6bd1ad6xjpua10ilslgflhi677pwf88fzqlla50000253141; webId=8ca236804996c89a734101e591aec49a; acw_tc=0a0bb14717427960474261178ea7da93e28ffe38372423abaa738f1e1e3200; websectiga=3633fe24d49c7dd0eb923edc8205740f10fdb18b25d424d2a2322c6196d2a4ad; sec_poison_id=132494eb-3809-4b3e-a51c-59919f74e213; gid=yj2SKDf2fJifyj2SKDfy0YA1fKCVU70y831MY101ki1x3i28KWWUEu888J2qy4y8Y8y0jq80; web_session=0400698e5c9689563ec14abdd5354bce82bc2f;"
+    cookie = "abRequestId=87bd2bac-2376-5b13-b127-2ae18c57efdd; a1=195c6bd1ad6xjpua10ilslgflhi677pwf88fzqlla50000253141; webId=8ca236804996c89a734101e591aec49a; gid=yj2SKDf2fJifyj2SKDfy0YA1fKCVU70y831MY101ki1x3i28KWWUEu888J2qy4y8Y8y0jq80; webBuild=4.60.2; acw_tc=0a0b13d917428867116887578e8861e7e0d7d3beb70edc0333204b617e4f7b; xsecappid=xhs-pc-web; websectiga=cf46039d1971c7b9a650d87269f31ac8fe3bf71d61ebf9d9a0a87efb414b816c; sec_poison_id=6b898c3b-4df7-4ca9-a267-d5b73d3c8807; web_session=040069b16a6515567369b413d7354bb27a088e; unread={%22ub%22:%2267bee4ad000000000603dc76%22%2C%22ue%22:%2267d14fca000000000d01712e%22%2C%22uc%22:33}; loadts=1742887929785"
     
     all_results = []
     

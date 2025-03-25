@@ -10,6 +10,7 @@ Excel相关性分析器模块。
 - 提取关键列用于相关性分析
 - 批量处理大量数据
 - 生成分析报告并保存结果
+- 支持缓存已分析的结果
 
 支持的数据源:
 - tripadvisor: TripAdvisor评论数据
@@ -46,6 +47,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 import json
 from datetime import datetime
 import glob
+import sys
 
 from processor.analyzers.ark_analyzer import ArkAnalyzer
 from loguru import logger
@@ -53,7 +55,7 @@ from loguru import logger
 class RelevanceAnalyzer:
     """
     Excel相关性分析器
-    分析不同数据源的Excel文件中的数据与指定关键词的相关性，并根据相关性过滤数据
+    分析不同数据源Excel文件中的数据与指定关键词的相关性，并根据相关性过滤数据
     """
     
     # 不同数据源的特有列，用于发送给AI进行相关性分析
@@ -105,7 +107,7 @@ class RelevanceAnalyzer:
         # 移除所有默认处理器
         logger.remove()
         
-        # 添加新的日志处理器
+        # 添加文件处理器
         logger.add(
             self.log_file,
             rotation="500 MB",
@@ -116,12 +118,69 @@ class RelevanceAnalyzer:
             level=log_level
         )
         
+        # 添加控制台处理器
+        logger.add(
+            sys.stdout,
+            level=log_level,
+            colorize=True,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+        )
+        
         # 保存logger实例
         self.logger = logger
         
+        # 输出初始化信息
+        logger.info("RelevanceAnalyzer日志系统初始化完成")
+
     def _log(self, message: str, level: str = 'info') -> None:
         """记录日志，支持不同级别"""
         getattr(self.logger, level.lower())(message)
+
+    def _find_cached_analysis(self, keyword: str) -> Optional[pd.DataFrame]:
+        """
+        查找已缓存的分析结果
+        
+        Args:
+            keyword: 关键词
+            
+        Returns:
+            Optional[pd.DataFrame]: 缓存的DataFrame，如果没有找到则返回None
+        """
+        # 查找所有已分析的文件
+        analyzed_files = glob.glob(str(self.processed_dir / "*_analyzed.xlsx"))
+        
+        for file_path in analyzed_files:
+            try:
+                df = pd.read_excel(file_path)
+                # 检查是否包含相同的关键词分析结果
+                if '关键词' in df.columns and df['关键词'].iloc[0] == keyword:
+                    self._log(f"找到缓存的分析结果: {file_path}")
+                    return df
+            except Exception as e:
+                self._log(f"读取缓存文件 {file_path} 时出错: {str(e)}", 'error')
+                continue
+        
+        return None
+
+    def _merge_with_cache(self, new_df: pd.DataFrame, cached_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        合并新的分析结果与缓存结果
+        
+        Args:
+            new_df: 新的分析结果DataFrame
+            cached_df: 缓存的DataFrame
+            
+        Returns:
+            pd.DataFrame: 合并后的DataFrame
+        """
+        # 确保两个DataFrame都有UID列
+        if 'UID' not in new_df.columns or 'UID' not in cached_df.columns:
+            self._log("DataFrame中缺少UID列，无法合并缓存", 'warning')
+            return new_df
+            
+        # 合并DataFrame，保留新的分析结果
+        merged_df = pd.concat([cached_df, new_df]).drop_duplicates(subset=['UID'], keep='last')
+        return merged_df
     
     def get_available_excel_files(self) -> List[str]:
         """
@@ -230,8 +289,25 @@ class RelevanceAnalyzer:
         # 读取Excel文件
         df = pd.read_excel(file_path)
         
+        # 检查是否有缓存的分析结果
+        cached_df = self._find_cached_analysis(keyword)
+        if cached_df is not None:
+            self._log("找到缓存的分析结果，将跳过已分析的数据")
+            # 过滤出未分析的数据
+            if 'UID' in df.columns and 'UID' in cached_df.columns:
+                analyzed_uids = set(cached_df['UID'])
+                new_df = df[~df['UID'].isin(analyzed_uids)].copy()
+                if len(new_df) == 0:
+                    self._log("所有数据都已分析过，直接使用缓存结果")
+                    return self._save_results(cached_df, file_name, keyword)
+            else:
+                self._log("DataFrame中缺少UID列，将重新分析所有数据", 'warning')
+                new_df = df
+        else:
+            new_df = df
+        
         # 检测数据源
-        source = self.detect_data_source(df)
+        source = self.detect_data_source(new_df)
         self._log(f"检测到数据源: {source}")
         
         # 确定要分析的特定列
@@ -244,12 +320,12 @@ class RelevanceAnalyzer:
         
         # 准备分析数据
         texts_to_analyze = []
-        for _, row in df.iterrows():
+        for _, row in new_df.iterrows():
             text = self.prepare_text_for_analysis(row, title_column, source, columns_to_analyze)
             texts_to_analyze.append(text)
         
         # 批量分析 - 让ArkAnalyzer处理并发控制
-        self._log(f"开始分析 {len(texts_to_analyze)} 条数据")
+        self._log(f"开始分析 {len(texts_to_analyze)} 条新数据")
         
         try:
             # 直接使用ArkAnalyzer的analyze_contents方法，让它内部处理并发和批处理
@@ -261,10 +337,29 @@ class RelevanceAnalyzer:
             results = [{'relevance_score': 0.0, 'explanation': f'分析错误: {str(e)}'} for _ in range(len(texts_to_analyze))]
         
         # 将结果添加到DataFrame
-        df['相关性分值'] = [result.get('relevance_score', 0.0) for result in results]
-        df['相关性'] = df['相关性分值'].apply(lambda x: True if x >= self.RELEVANCE_THRESHOLD else False)
-        df['相关性解释'] = [result.get('explanation', '') for result in results]
+        new_df['相关性分值'] = [result.get('relevance_score', 0.0) for result in results]
+        new_df['相关性'] = new_df['相关性分值'].apply(lambda x: True if x >= self.RELEVANCE_THRESHOLD else False)
+        new_df['相关性解释'] = [result.get('explanation', '') for result in results]        
+        # 如果有缓存结果，合并新旧数据
+        if cached_df is not None:
+            final_df = self._merge_with_cache(new_df, cached_df)
+        else:
+            final_df = new_df
         
+        return self._save_results(final_df, file_name, keyword)
+    
+    def _save_results(self, df: pd.DataFrame, file_name: str, keyword: str) -> Tuple[str, str]:
+        """
+        保存分析结果
+        
+        Args:
+            df: 要保存的DataFrame
+            file_name: 原始文件名
+            keyword: 关键词
+            
+        Returns:
+            Tuple[str, str]: 分析后的文件名和过滤后的文件名
+        """
         # 保存分析结果
         analyzed_file_name = f"{os.path.splitext(file_name)[0]}_analyzed.xlsx"
         analyzed_file_path = self.processed_dir / analyzed_file_name

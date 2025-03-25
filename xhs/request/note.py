@@ -20,10 +20,10 @@ class Notes:
     def __init__(self, arf: AsyncRequestFramework):
         self.arf = arf
         self._host = "https://edith.xiaohongshu.com"
-        self.max_retries = 2  # 最大重试次数
-        self.retry_delay = 1  # 基础重试延迟（秒）
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 2  # 基础重试延迟（秒）
 
-    async def get_note_detail(self, note_id: str, xsec_token: str = "") -> Dict:
+    async def get_note_detail(self, note_id: str, xsec_token: str = "", proxy: dict = {}) -> Dict:
         """获取笔记详情
 
         Args:
@@ -52,7 +52,8 @@ class Notes:
                         url=url,
                         method="GET",
                         params=params,
-                        back_fun=True
+                        back_fun=True,
+                        proxy=proxy
                     )
                 except Exception as e:
                     logger.error(f"请求笔记详情失败: note_id={note_id}, error={str(e)}")

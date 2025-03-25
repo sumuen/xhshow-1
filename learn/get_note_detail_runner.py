@@ -227,7 +227,7 @@ class NoteDetailRunner:
                         logger.error(f"处理笔记 {note_id} 详情时出错: {str(e)}")
                 
                 # 添加延时避免请求过快
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)
             
             # 保存最后一批数据
             if batch:

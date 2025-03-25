@@ -1,15 +1,33 @@
-"""方舟 API 分析器实现"""
+"""
+方舟分析器模块。
+
+提供了方舟平台AI分析功能的封装。
+"""
+
 import os
 import json
 import re
 import asyncio
+import random
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional, Union
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from .base_analyzer import BaseAnalyzer
 from .prompt_templates import RELEVANCE_USER_PROMPT, RELEVANCE_SYSTEM_PROMPT
+from loguru import logger
 
 load_dotenv()
+
+# 检查是否需要将日志输出到控制台
+PRINT_TO_CONSOLE = os.environ.get("PRINT_LOGS_TO_CONSOLE", "0") == "1"
+
+# 如果需要输出到控制台，创建一个简单的钩子函数
+def print_log_to_console(message: str, level: str = "INFO") -> None:
+    """将日志输出到控制台"""
+    if PRINT_TO_CONSOLE:
+        print(f"[ArkAnalyzer] {level}: {message}", flush=True)
 
 class ArkAnalyzer(BaseAnalyzer):
     """
@@ -120,7 +138,7 @@ class ArkAnalyzer(BaseAnalyzer):
                         # 尝试解析并格式化JSON
                         json_data = json.loads(response_content)
                         formatted_json = json.dumps(json_data, ensure_ascii=False, indent=2)
-                        self._log(f"API响应内容(JSON格式):\n{formatted_json[:1000]}{'...' if len(formatted_json) > 1000 else ''}")
+                        # self._log(f"API响应内容(JSON格式):\n{formatted_json[:1000]}{'...' if len(formatted_json) > 1000 else ''}")
                     except json.JSONDecodeError:
                         # 如果不是JSON，直接输出文本
                         self._log(f"API响应内容(文本格式):\n{response_content[:500]}{'...' if len(response_content) > 500 else ''}")
