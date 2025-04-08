@@ -86,8 +86,8 @@ class RelevanceAnalyzer:
             log_level: 日志级别，默认为'INFO'
         """
         self._setup_logging(log_level)
-        self.processed_dir = Path('processed')
-        self.processed_dir.mkdir(exist_ok=True)
+        self.processed_dir = Path('processed/rednote')
+        self.processed_dir.mkdir(parents=True, exist_ok=True)
         self.log_level = log_level
         
         # 初始化分析器

@@ -81,7 +81,7 @@ class BatchAttractionProcessor:
         """
         try:
             df = pd.read_excel(self.input_file)
-            required_columns = ['景点名称', '景点ID']
+            required_columns = ['英文关键词', '景点ID']
             
             # 检查必要的列是否存在
             missing_columns = [col for col in required_columns if col not in df.columns]
@@ -91,13 +91,35 @@ class BatchAttractionProcessor:
             
             # 转换为字典列表
             attractions = []
-            for _, row in df.iterrows():
+            for index, row in df.iterrows():
+                # 跳过任何缺少关键词或ID的行
+                if pd.isna(row['英文关键词']) or pd.isna(row['景点ID']):
+                    logger.warning(f"第 {index+1} 行缺少关键词或ID，跳过")
+                    continue
+                
+                # 处理景点ID，确保它是整数字符串（移除.0）
+                spot_id = row['景点ID']
+                try:
+                    if isinstance(spot_id, float):
+                        # 如果是浮点数，转换为整数字符串
+                        spot_id = str(int(spot_id))
+                    elif isinstance(spot_id, (int, str)):
+                        # 确保其他类型也被正确处理
+                        spot_id = str(spot_id).split('.')[0]  # 移除任何可能的小数部分
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"第 {index+1} 行景点ID格式无效: {spot_id}, 错误: {str(e)}, 跳过此行")
+                    continue
+                
                 attraction = {
-                    'keyword': row['景点名称'],
-                    'spot_id': str(row['景点ID'])
+                    'keyword': row['英文关键词'],
+                    'spot_id': spot_id
                 }
                 attractions.append(attraction)
             
+            if not attractions:
+                logger.warning("没有找到有效的景点数据")
+                return []
+                
             logger.info(f"成功加载 {len(attractions)} 个景点")
             return attractions
         except Exception as e:
@@ -196,8 +218,8 @@ class BatchAttractionProcessor:
         """
         try:
             # 创建结果目录
-            result_dir = Path('results')
-            result_dir.mkdir(exist_ok=True)
+            result_dir = Path('results/rednote')
+            result_dir.mkdir(parents=True, exist_ok=True)
             
             # 生成结果文件名
             result_file = result_dir / f"batch_results_{datetime.now().strftime('%Y%m%d')}.xlsx"
@@ -217,7 +239,7 @@ class BatchAttractionProcessor:
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='批量景点分析工具')
-    parser.add_argument('--input', required=True, help='输入的Excel文件路径，包含景点名称和ID')
+    parser.add_argument('--input', required=True, help='输入的Excel文件路径，包含英文关键词和ID')
     parser.add_argument('--cookie', default="", help='小红书cookie')
     parser.add_argument('--log_level', default='INFO', help='日志级别')
     return parser.parse_args()

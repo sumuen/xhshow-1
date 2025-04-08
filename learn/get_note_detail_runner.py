@@ -266,7 +266,8 @@ class NoteDetailRunner:
 
     def get_latest_search_file(self) -> str:
         """获取最新的搜索结果文件"""
-        processed_dir = "processed"
+        processed_dir = "processed/rednote"
+        os.makedirs(processed_dir, exist_ok=True)
         search_results_files = [f for f in os.listdir(processed_dir) if f.startswith("search_results_")]
         if not search_results_files:
             raise FileNotFoundError("未找到搜索结果文件")

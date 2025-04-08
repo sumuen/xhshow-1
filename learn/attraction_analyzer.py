@@ -95,8 +95,15 @@ class AttractionAnalyzer:
         self.log_level = log_level
         self.setup_logger()
         
+        # 确保processed目录存在
+        self.processed_dir = Path('processed/rednote')
+        self.processed_dir.mkdir(parents=True, exist_ok=True)
+        
         # 初始化相关性分析器 - 使用修改后的相关性分析器
         self.relevance_analyzer = RelevanceAnalyzer(log_level=log_level)
+        
+        # 直接设置RelevanceAnalyzer的processed_dir路径
+        self.relevance_analyzer.processed_dir = self.processed_dir
         
         # 替换ArkAnalyzer为控制台输出版本
         self.relevance_analyzer.analyzer = ConsolePrintingArkAnalyzer(
@@ -107,10 +114,6 @@ class AttractionAnalyzer:
         
         # 初始化笔记详情获取器
         self.note_detail_runner = NoteDetailRunner()
-        
-        # 确保processed目录存在
-        self.processed_dir = Path('processed')
-        self.processed_dir.mkdir(exist_ok=True)
         
     def setup_logger(self):
         """设置日志记录器"""
@@ -196,14 +199,17 @@ class AttractionAnalyzer:
         logger.info(f"开始分析文件 {file_path} 中笔记与关键词 '{keyword}' 的相关性")
         
         try:
-            # 直接调用RelevanceAnalyzer进行分析
+            # 获取文件名
             file_name = os.path.basename(file_path)
+            
+            # 直接调用RelevanceAnalyzer进行分析，传递文件名
             analyzed_file, _ = await self.relevance_analyzer.analyze_excel(
                 file_name, 
                 "标题", 
                 keyword
             )
             
+            # 获取分析后的文件路径
             analyzed_path = self.processed_dir / analyzed_file
             logger.info(f"相关性分析完成，结果保存至: {analyzed_path}")
             return str(analyzed_path)
@@ -254,6 +260,7 @@ class AttractionAnalyzer:
             
             # 检查是否已存在详情文件，如果存在则加载已有数据
             existing_details = {}
+            existing_df = None
             if os.path.exists(detail_file):
                 try:
                     existing_df = pd.read_excel(detail_file)
@@ -334,7 +341,16 @@ class AttractionAnalyzer:
                         # 每处理batch_size条记录保存一次
                         if len(batch) >= batch_size:
                             try:
-                                self.note_detail_runner.save_to_excel(batch, detail_file)
+                                # 读取当前文件内容，确保不会覆盖已有数据
+                                current_df = None
+                                if os.path.exists(detail_file):
+                                    try:
+                                        current_df = pd.read_excel(detail_file)
+                                    except Exception as read_e:
+                                        logger.warning(f"读取现有详情文件出错: {str(read_e)}，将创建新文件")
+                                
+                                # 保存数据，包括之前的内容
+                                self.note_detail_runner.save_to_excel(batch, detail_file, current_df)
                                 logger.info(f"已保存一批 {len(batch)} 条笔记详情")
                                 batch = []  # 清空批次
                             except Exception as save_e:
@@ -426,7 +442,16 @@ class AttractionAnalyzer:
                             # 每处理batch_size条记录保存一次
                             if len(batch) >= batch_size:
                                 try:
-                                    self.note_detail_runner.save_to_excel(batch, detail_file)
+                                    # 读取当前文件内容，确保不会覆盖已有数据
+                                    current_df = None
+                                    if os.path.exists(detail_file):
+                                        try:
+                                            current_df = pd.read_excel(detail_file)
+                                        except Exception as read_e:
+                                            logger.warning(f"读取现有详情文件出错: {str(read_e)}，将创建新文件")
+                                    
+                                    # 保存数据，包括之前的内容
+                                    self.note_detail_runner.save_to_excel(batch, detail_file, current_df)
                                     logger.info(f"已保存一批 {len(batch)} 条笔记详情")
                                     batch = []  # 清空批次
                                 except Exception as save_e:
@@ -448,7 +473,16 @@ class AttractionAnalyzer:
             # 保存最后一批数据
             if batch:
                 try:
-                    self.note_detail_runner.save_to_excel(batch, detail_file)
+                    # 读取当前文件内容，确保不会覆盖已有数据
+                    current_df = None
+                    if os.path.exists(detail_file):
+                        try:
+                            current_df = pd.read_excel(detail_file)
+                        except Exception as read_e:
+                            logger.warning(f"读取现有详情文件出错: {str(read_e)}，将创建新文件")
+                    
+                    # 保存数据，包括之前的内容
+                    self.note_detail_runner.save_to_excel(batch, detail_file, current_df)
                     logger.info(f"最后一批数据已保存，共 {len(batch)} 条")
                 except Exception as e:
                     logger.error(f"保存最后一批数据出错: {str(e)}")

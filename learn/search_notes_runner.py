@@ -6,6 +6,9 @@ from xhs.encrypt.misc_encrypt import MiscEncrypt
 from xhs.request.note import Notes
 from xhs.request.AsyncRequestFramework import AsyncRequestFramework
 from loguru import logger
+import os
+import random
+import string
 
 def parse_cookie_string(cookie_str: str) -> dict:
     """将 cookie 字符串解析为字典
@@ -73,39 +76,115 @@ def format_note_info(note):
         'xsec_token': note.get('xsec_token', '')
     }
 
-async def process_keyword(keyword: str, attraction_id: str, cookie: str):
-    """处理单个关键词的搜索"""
+async def process_keyword(keyword: str, attraction_id: str, cookie: str, max_pages: int = 11, max_retries: int = 3, retry_delay: float = 5.0):
+    """处理单个关键词的搜索
+    
+    Args:
+        keyword: 搜索关键词
+        attraction_id: 景点ID
+        cookie: 小红书cookie
+        max_pages: 最大页数，默认11页
+        max_retries: 最大重试次数，默认3次
+        retry_delay: 重试延迟时间，默认5秒
+        
+    Returns:
+        list: 搜索结果列表
+    """
     all_notes = []
     
     # 为每个关键词生成一个search_id
-    search_id = await MiscEncrypt.search_id()
-    logger.info(f"开始处理关键词: {keyword} (景点ID: {attraction_id}), search_id: {search_id}")
+    try:
+        search_id = await MiscEncrypt.search_id()
+        logger.info(f"开始处理关键词: {keyword} (景点ID: {attraction_id}), search_id: {search_id}")
+    except Exception as e:
+        logger.error(f"生成search_id失败: {str(e)}")
+        # 使用备用方法
+        search_id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(21))
+        logger.warning(f"使用随机生成的search_id: {search_id}")
     
-    for page in range(1, 12):  # 1-11页
+    # 检查cookie是否有效
+    if not cookie:
+        logger.warning(f"未提供cookie，搜索可能受限")
+    
+    for page in range(1, max_pages):  # 1-10页
         logger.info(f"正在搜索关键词 '{keyword}' 的第 {page} 页")
-        result = await search_xhs_notes(keyword, page=page, cookie=cookie, search_id=search_id)
         
-        if result and result.get('success'):
-            data = result.get('data', {})
-            items = data.get('items', [])
-            
-            for item in items:
-                if item.get('model_type') == 'note':
-                    note_info = format_note_info(item)
-                    note_info['景区ID'] = attraction_id
-                    note_info['景区关键词'] = keyword
-                    note_info['数据来源'] = '小红书'
-                    note_info['链接'] = f"https://www.xiaohongshu.com/explore/{note_info['UID']}?xsec_token={note_info['xsec_token']}"
-                    all_notes.append(note_info)
-            
-            logger.info(f"关键词 '{keyword}' 第 {page} 页找到 {len(items)} 条笔记")
-            
-            if not data.get('has_more'):
-                logger.info(f"关键词 '{keyword}' 没有更多结果，停止搜索")
-                break
-        else:
-            logger.warning(f"关键词 '{keyword}' 第 {page} 页搜索失败")
+        # 重试机制
+        for retry in range(max_retries):
+            try:
+                result = await search_xhs_notes(keyword, page=page, cookie=cookie, search_id=search_id)
+                
+                if result:
+                    if "error" in result:
+                        logger.warning(f"搜索返回错误: {result.get('error')} - {result.get('message', '')}")
+                        if retry < max_retries - 1:
+                            logger.info(f"将在 {retry_delay} 秒后重试...")
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        else:
+                            logger.error(f"搜索关键词 '{keyword}' 第 {page} 页失败，达到最大重试次数")
+                            break
+                    
+                    if result.get('success'):
+                        data = result.get('data', {})
+                        items = data.get('items', [])
+                        
+                        # 提取笔记信息
+                        page_notes = []
+                        for item in items:
+                            if item.get('model_type') == 'note':
+                                note_info = format_note_info(item)
+                                note_info['景区ID'] = attraction_id
+                                note_info['景区关键词'] = keyword
+                                note_info['数据来源'] = '小红书'
+                                note_info['链接'] = f"https://www.xiaohongshu.com/explore/{note_info['UID']}?xsec_token={note_info['xsec_token']}"
+                                page_notes.append(note_info)
+                        
+                        all_notes.extend(page_notes)
+                        logger.info(f"关键词 '{keyword}' 第 {page} 页找到 {len(page_notes)} 条笔记")
+                        
+                        # 检查是否有更多结果
+                        if not data.get('has_more'):
+                            logger.info(f"关键词 '{keyword}' 没有更多结果，停止搜索")
+                            break
+                        
+                        # 成功处理，跳出重试循环
+                        break
+                    else:
+                        logger.warning(f"关键词 '{keyword}' 第 {page} 页搜索返回非成功状态")
+                        if retry < max_retries - 1:
+                            logger.info(f"将在 {retry_delay} 秒后重试...")
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        else:
+                            logger.error(f"搜索关键词 '{keyword}' 第 {page} 页失败，达到最大重试次数")
+                            break
+                else:
+                    logger.warning(f"关键词 '{keyword}' 第 {page} 页搜索返回空结果")
+                    if retry < max_retries - 1:
+                        logger.info(f"将在 {retry_delay} 秒后重试...")
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    else:
+                        logger.error(f"搜索关键词 '{keyword}' 第 {page} 页失败，达到最大重试次数")
+                        break
+                        
+            except Exception as e:
+                logger.error(f"搜索关键词 '{keyword}' 第 {page} 页时发生错误: {str(e)}")
+                if retry < max_retries - 1:
+                    logger.info(f"将在 {retry_delay} 秒后重试...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.error(f"搜索关键词 '{keyword}' 第 {page} 页失败，达到最大重试次数")
+                    break
+        
+        # 每页之间添加延迟，避免请求过快
+        if page < max_pages - 1:
+            page_delay = random.uniform(3.0, 6.0)
+            logger.info(f"等待 {page_delay:.2f} 秒后搜索下一页...")
+            await asyncio.sleep(page_delay)
     
+    logger.info(f"关键词 '{keyword}' 搜索完成，共找到 {len(all_notes)} 条笔记")
     return all_notes
 
 async def main():
@@ -128,7 +207,7 @@ async def main():
         logger.error(f"读取关键词文件失败: {str(e)}")
         return
     
-    cookie = "abRequestId=87bd2bac-2376-5b13-b127-2ae18c57efdd; a1=195c6bd1ad6xjpua10ilslgflhi677pwf88fzqlla50000253141; webId=8ca236804996c89a734101e591aec49a; gid=yj2SKDf2fJifyj2SKDfy0YA1fKCVU70y831MY101ki1x3i28KWWUEu888J2qy4y8Y8y0jq80; webBuild=4.60.2; acw_tc=0a0b13d917428867116887578e8861e7e0d7d3beb70edc0333204b617e4f7b; xsecappid=xhs-pc-web; websectiga=cf46039d1971c7b9a650d87269f31ac8fe3bf71d61ebf9d9a0a87efb414b816c; sec_poison_id=6b898c3b-4df7-4ca9-a267-d5b73d3c8807; web_session=040069b16a6515567369b413d7354bb27a088e; unread={%22ub%22:%2267bee4ad000000000603dc76%22%2C%22ue%22:%2267d14fca000000000d01712e%22%2C%22uc%22:33}; loadts=1742887929785"
+    cookie = "ABBBCCCCC"
     
     all_results = []
     
@@ -146,7 +225,9 @@ async def main():
     if all_results:
         result_df = pd.DataFrame(all_results)
         # 保存到processed目录
-        output_file = f"processed/search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        output_dir = "processed/rednote"
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = f"{output_dir}/search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         result_df.to_excel(output_file, index=False)
         logger.info(f"结果已保存到: {output_file}")
         logger.info(f"总共找到 {len(all_results)} 条笔记")
