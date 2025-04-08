@@ -1,3 +1,4 @@
+# 本项目 fork from https://github.com/Cloxl/xhshow
 # 景点分析工具
 
 这是一个用于分析小红书景点相关笔记的工具，支持单个景点分析和批量处理多个景点。
