@@ -1,3 +1,26 @@
+Metadata-Version: 2.4
+Name: xhshow-1
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: aiofiles~=24.1.0
+Requires-Dist: beautifulsoup4~=4.13.3
+Requires-Dist: demjson3>=3.0.6
+Requires-Dist: dotenv>=0.9.9
+Requires-Dist: loguru~=0.7.2
+Requires-Dist: lxml~=5.3.0
+Requires-Dist: openai>=1.68.2
+Requires-Dist: openpyxl~=3.1.5
+Requires-Dist: pandas~=2.2.3
+Requires-Dist: pillow~=11.1.0
+Requires-Dist: pycryptodome~=3.21.0
+Requires-Dist: requests~=2.32.3
+Requires-Dist: typeguard~=4.4.1
+Dynamic: license-file
+Dynamic: requires-python
+
 # 景点分析工具
 
 这是一个用于分析小红书景点相关笔记的工具，支持单个景点分析和批量处理多个景点。
@@ -39,7 +62,7 @@ python -m learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001" --log
 ```
 
 参数说明：
-- `--keyword`: 英文关键词（必填）
+- `--keyword`: 景点名称（必填）
 - `--spot_id`: 景点ID（必填）
 - `--cookie`: 小红书cookie（可选）
 - `--log_level`: 日志级别，可选值：DEBUG, INFO, WARNING, ERROR（默认：INFO）
@@ -48,7 +71,7 @@ python -m learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001" --log
 
 首先准备一个包含景点信息的Excel文件（例如`attractions.xlsx`），格式如下：
 
-| 英文关键词 | 景点ID |
+| 景点名称 | 景点ID |
 |---------|-------|
 | 西湖 | 1001 |
 | 故宫 | 1002 |

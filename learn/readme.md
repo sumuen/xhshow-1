@@ -35,7 +35,7 @@ uv pip install -r requirements.txt
 ### 1. 分析单个景点
 
 ```bash
-python -m learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001" --log_level INFO
+uv run -m learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001" --log_level INFO
 ```
 
 参数说明：
@@ -57,7 +57,7 @@ python -m learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001" --log
 然后运行批量处理命令：
 
 ```bash
-python -m learn.batch_analyze_attractions --input_file "attractions.xlsx" --cookie "your_cookie" --log_level INFO
+uv run -m learn.batch_analyze_attractions --input_file "attractions.xlsx" --cookie "your_cookie" --log_level INFO
 ```
 
 参数说明：
