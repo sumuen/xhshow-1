@@ -14,7 +14,7 @@ setup(
         "openai>=1.68.2",
         "openpyxl~=3.1.5",
         "pandas~=2.2.3",
-        "pillow~=11.1.0",
+        "pillow>=11.1,<11.3",
         "pycryptodome~=3.21.0",
         "requests~=2.32.3",
         "typeguard~=4.4.1",
