@@ -50,22 +50,13 @@ uv run main.py
 uv run -m crawler.rednote.learn.analyze_attraction_cmd --keyword "西湖" --spot_id "1001"
 
 # 批量景点分析
-uv run -m crawler.rednote.learn.batch_analyze_attractions --input "attractions/rednote.xlsx"
+uv run -m crawler.rednote.learn.batch_analyze_attractions --input "attractions/attractions.xlsx"
 ```
 
 ## 批量分析模板文件
 
 为了方便进行批量分析，提供了一个模板生成工具：
 
-```bash
-uv run create_template.py
-```
-
-这将在`attractions`目录下创建一个名为`rednote.xlsx`的模板文件，包含以下列：
-- 英文关键词：景点的英文名称（用于搜索）
-- 景点ID：景点的唯一标识
-
-根据需要填写景点信息，然后使用批量分析功能（菜单选项16）进行分析。
 
 ## 数据格式要求
 
