@@ -10,4 +10,4 @@ pandas~=2.2.3
 pillow~=11.2.1
 pycryptodome~=3.23.0
 requests~=2.32.3
-typeguard~=4.4.1
+typeguard~=4.4.3
