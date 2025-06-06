@@ -13,7 +13,7 @@ setup(
         "lxml~=5.3.0",
         "openai>=1.68.2",
         "openpyxl~=3.1.5",
-        "pandas~=2.2.3",
+        "pandas>=2.2.3,<2.4.0",
         "pillow>=11.1,<11.3",
         "pycryptodome>=3.21,<3.24",
         "requests~=2.32.3",
