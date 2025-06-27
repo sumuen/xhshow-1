@@ -10,7 +10,7 @@ setup(
         "demjson3>=3.0.6",
         "dotenv>=0.9.9",
         "loguru~=0.7.2",
-        "lxml~=5.3.0",
+        "lxml>=5.3,<6.1",
         "openai>=1.68.2",
         "openpyxl~=3.1.5",
         "pandas>=2.2.3,<2.4.0",
