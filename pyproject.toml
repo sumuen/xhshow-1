@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiofiles~=24.1.0",
-    "beautifulsoup4~=4.13.3",
+    "beautifulsoup4~=4.14.2",
     "demjson3>=3.0.6",
     "dotenv>=0.9.9",
     "loguru~=0.7.2",
