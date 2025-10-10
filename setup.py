@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "aiofiles~=24.1.0",
+        "aiofiles>=24.1,<25.2",
         "beautifulsoup4~=4.13.3",
         "demjson3>=3.0.6",
         "dotenv>=0.9.9",
