@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "aiofiles~=24.1.0",
-        "beautifulsoup4~=4.13.3",
+        "beautifulsoup4>=4.13.3,<4.15.0",
         "demjson3>=3.0.6",
         "dotenv>=0.9.9",
         "loguru~=0.7.2",
